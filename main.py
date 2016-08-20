@@ -2,11 +2,31 @@
 import json, urllib
 from flask import Flask, request, abort
 import requests
+import gspread
+from datetime import datetime 
+from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
 
-access_token = 'EAAXk6GLIlXcBAHRnz32wf1En9dwNyFBM89KBo6AK38OnMoEmNEGCuNQoGeK4bdl1H5Nq0EA63N95Q7WXjZBoInvkwrGEfDATG9dOZB9Lr2tuHtJbKwGzEppZCus3QWEntls7UZClT7jZC32XGYzl74HQrQubfeJGm6DMhyxqUnAZDZD'
+access_token = '<ACCESS_TOKEN>'
 
+credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', ['https://spreadsheets.google.com/feeds'])
+gc = gspread.authorize(credentials)
+wks = gc.open("GSpread testsheet").sheet1
+
+def wks_subscribe_user(id):
+	vals = wks.col_values(1)
+	empty_index = 0
+	for val in vals:
+		empty_index = empty_index + 1
+		if val == '':
+			break;
+		if val == str(id):
+			return False
+			
+	wks.update_cell(empty_index,1,id)
+	wks.update_cell(empty_index,2,str(datetime.now()))
+	return True
 
 @app.route("/", methods=["GET"])
 def root():
@@ -37,10 +57,17 @@ def post_webhook():
 
                     if 'text' in messaging_event['message']:
                         message_text = messaging_event['message']['text']
-                        image = "http://cdn.shopify.com/s/files/1/0080/8372/products/tattly_jen_mussari_hello_script_web_design_01_grande.jpg"
-                        element = create_generic_template_element("Hello", image, message_text)
-                        reply_with_generic_template(sender_id, [element])
-
+			#image = "http://cdn.shopify.com/s/files/1/0080/8372/products/tattly_jen_mussari_hello_script_web_design_01_grande.jpg"
+                        #element = create_generic_template_element("Hello", image, message_text)
+                        #reply_with_generic_template(sender_id, [element])
+			if 'subscribe' in message_text:
+			    if wks_subscribe_user(sender_id):
+				reply_with_text(sender_id, "thanks for subscribing!")
+			    else:
+				reply_with_text(sender_id, "you're already subscribed!")
+			else:
+			    reply_with_text(sender_id, "hi!")
+			
                         #do_rules(sender_id, message_text)
 
     return "ok", 200
@@ -124,6 +151,7 @@ def reply_to_facebook(recipient_id, message):
     url = "https://graph.facebook.com/v2.6/me/messages?" + urllib.urlencode(params)
     r = requests.post(url=url, headers=headers, data=data)
 
+    print("Response: ",str(data))
 
 # create template elements for carousel, images with buttons, quick replies, …
 
